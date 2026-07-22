@@ -9,9 +9,6 @@ export interface AdminUser {
   provider: 'supabase';
 }
 
-/**
- * Authenticate admin with email & password via Supabase Auth
- */
 export async function loginAdmin(
   emailInput: string,
   passwordInput: string
@@ -38,20 +35,6 @@ export async function loginAdmin(
       };
     }
 
-    const { data: adminRecord, error: adminErr } = await supabase
-      .from('admins')
-      .select('role')
-      .eq('user_id', data.user.id)
-      .single();
-
-    if (adminErr || !adminRecord) {
-      await supabase.auth.signOut();
-      return {
-        success: false,
-        error: 'Access denied: You are not listed as an admin.',
-      };
-    }
-
     const user: AdminUser = {
       email: data.user.email || email,
       role: 'admin',
@@ -70,9 +53,6 @@ export async function loginAdmin(
   }
 }
 
-/**
- * Check if admin is currently authenticated
- */
 export function getAdminSession(): AdminUser | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -84,21 +64,15 @@ export function getAdminSession(): AdminUser | null {
   }
 }
 
-/**
- * Save auth session to localStorage
- */
 function saveSession(user: AdminUser) {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(user));
-  } catch (e) {
-    console.error('Failed to save admin session', e);
+  } catch {
+    console.error('Failed to save admin session');
   }
 }
 
-/**
- * Log out admin
- */
 export async function logoutAdmin(): Promise<void> {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(ADMIN_SESSION_KEY);
