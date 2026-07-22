@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ShieldCheck, Lock, Mail, Eye, EyeOff, KeyRound, AlertCircle, Sparkles, ArrowRight } from 'lucide-react';
-import { loginAdmin, DEMO_ADMIN_CREDENTIALS, AdminUser } from '@/lib/auth';
+import { ShieldCheck, Lock, Mail, Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react';
+import { loginAdmin, AdminUser } from '@/lib/auth';
 
 interface AdminLoginProps {
   onLoginSuccess: (user: AdminUser) => void;
@@ -32,17 +32,11 @@ export function AdminLogin({ onLoginSuccess }: AdminLoginProps) {
       } else {
         setError(res.error || 'Authentication failed.');
       }
-    } catch (err) {
+    } catch {
       setError('An unexpected login error occurred.');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleFillDemo = () => {
-    setEmail(DEMO_ADMIN_CREDENTIALS.email);
-    setPassword(DEMO_ADMIN_CREDENTIALS.password);
-    setError('');
   };
 
   return (
@@ -58,27 +52,6 @@ export function AdminLogin({ onLoginSuccess }: AdminLoginProps) {
             Sign in to access patient body pain registry & analytics
           </p>
         </div>
-      </div>
-
-      {/* Demo Credentials Quick Fill Banner */}
-      <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-xs flex items-center justify-between">
-        <div className="space-y-0.5">
-          <div className="font-semibold text-indigo-300 flex items-center gap-1.5">
-            <KeyRound className="w-3.5 h-3.5" />
-            <span>Default Demo Credentials</span>
-          </div>
-          <p className="text-[11px] text-slate-400">
-            <span className="font-mono text-slate-200">admin@visually.med</span> / <span className="font-mono text-slate-200">admin123</span>
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleFillDemo}
-          className="px-2.5 py-1 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 text-[11px] font-semibold border border-indigo-500/30 transition-colors"
-        >
-          Auto Fill
-        </button>
       </div>
 
       {/* Error Message Alert */}

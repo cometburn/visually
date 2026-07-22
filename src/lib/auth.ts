@@ -6,66 +6,68 @@ export interface AdminUser {
   email: string;
   role: 'admin';
   loggedInAt: string;
-  provider: 'supabase' | 'demo';
+  provider: 'supabase';
 }
 
-// Default fallback credentials for testing / demo mode
-export const DEMO_ADMIN_CREDENTIALS = {
-  email: 'admin@visually.med',
-  password: 'admin123',
-};
-
 /**
- * Authenticate admin with email & password
+ * Authenticate admin with email & password via Supabase Auth
  */
 export async function loginAdmin(
   emailInput: string,
   passwordInput: string
 ): Promise<{ success: boolean; user?: AdminUser; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) {
+    return {
+      success: false,
+      error: 'Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment.',
+    };
+  }
+
   const email = emailInput.trim().toLowerCase();
 
-  // 1. Try Supabase Auth if configured
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: passwordInput,
-      });
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password: passwordInput,
+    });
 
-      if (!error && data.user) {
-        const user: AdminUser = {
-          email: data.user.email || email,
-          role: 'admin',
-          loggedInAt: new Date().toISOString(),
-          provider: 'supabase',
-        };
-        saveSession(user);
-        return { success: true, user };
-      }
-    } catch (err: any) {
-      console.warn('Supabase Auth attempt failed, checking fallback auth:', err.message);
+    if (error || !data.user) {
+      return {
+        success: false,
+        error: error?.message || 'Invalid credentials.',
+      };
     }
-  }
 
-  // 2. Demo / Local Auth Check
-  if (
-    (email === DEMO_ADMIN_CREDENTIALS.email || email === 'admin@visually.com' || email === 'admin') &&
-    passwordInput === DEMO_ADMIN_CREDENTIALS.password
-  ) {
+    const { data: adminRecord, error: adminErr } = await supabase
+      .from('admins')
+      .select('role')
+      .eq('user_id', data.user.id)
+      .single();
+
+    if (adminErr || !adminRecord) {
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error: 'Access denied: You are not listed as an admin.',
+      };
+    }
+
     const user: AdminUser = {
-      email: email.includes('@') ? email : 'admin@visually.med',
+      email: data.user.email || email,
       role: 'admin',
       loggedInAt: new Date().toISOString(),
-      provider: 'demo',
+      provider: 'supabase',
     };
+
     saveSession(user);
     return { success: true, user };
+  } catch {
+    console.error('Supabase Auth error');
+    return {
+      success: false,
+      error: 'An unexpected authentication error occurred.',
+    };
   }
-
-  return {
-    success: false,
-    error: 'Invalid admin email or password. (Demo credentials: admin@visually.med / admin123)',
-  };
 }
 
 /**
@@ -105,7 +107,7 @@ export async function logoutAdmin(): Promise<void> {
   if (isSupabaseConfigured && supabase) {
     try {
       await supabase.auth.signOut();
-    } catch (e) {
+    } catch {
       // ignore
     }
   }

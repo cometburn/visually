@@ -55,6 +55,22 @@ CREATE POLICY "Allow public insert access to pain_assessments" ON public.pain_as
 CREATE POLICY "Allow public read access to pain_entries" ON public.pain_entries FOR SELECT USING (true);
 CREATE POLICY "Allow public insert access to pain_entries" ON public.pain_entries FOR INSERT WITH CHECK (true);
 
+-- 4. Create Admins Table
+CREATE TABLE IF NOT EXISTS public.admins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE NOT NULL,
+    email TEXT NOT NULL,
+    role TEXT DEFAULT 'admin' CHECK (role IN ('admin', 'superadmin')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_admins_user_id ON public.admins(user_id);
+
+ALTER TABLE public.admins ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow service role full access to admins" ON public.admins FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Allow authenticated admin read access to admins" ON public.admins FOR SELECT USING (auth.uid() IN (SELECT user_id FROM public.admins));
+
 -- =========================================================
 -- SEED DATA (FOR TESTING ADMIN DASHBOARD)
 -- =========================================================
