@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { AssessmentSubmissionPayload, PainAssessment, Patient, PainEntry } from '@/types/database';
+import { AssessmentSubmissionPayload, PainAssessment, Patient, PainEntry, AssessmentQuestion } from '@/types/database';
+import { getLocalQuestions, saveLocalQuestions } from './questions';
 
 const LOCAL_STORAGE_KEY = 'visually_pain_assessments';
 
@@ -184,6 +185,7 @@ export async function savePainAssessment(payload: AssessmentSubmissionPayload): 
       if (assessErr) throw assessErr;
 
       // Insert Pain Entries
+      const entryIds: string[] = [];
       if (payload.entries.length > 0) {
         const entriesToInsert = payload.entries.map((entry) => ({
           assessment_id: assessData.id,
@@ -196,8 +198,40 @@ export async function savePainAssessment(payload: AssessmentSubmissionPayload): 
           notes: entry.notes || null,
         }));
 
-        const { error: entriesErr } = await supabase.from('pain_entries').insert(entriesToInsert);
+        const { data: insertedEntries, error: entriesErr } = await supabase
+          .from('pain_entries')
+          .insert(entriesToInsert)
+          .select('id');
+
         if (entriesErr) throw entriesErr;
+        if (insertedEntries) {
+          for (const ent of insertedEntries) {
+            entryIds.push(ent.id);
+          }
+        }
+      }
+
+      // Insert Answers
+      if (entryIds.length > 0) {
+        const answersToInsert: Array<{ entry_id: string; question_id: string; selected_option: string }> = [];
+        for (let i = 0; i < payload.entries.length; i++) {
+          const entry = payload.entries[i];
+          const entryId = entryIds[i];
+          if (entry.answers && entryId) {
+            for (const ans of entry.answers) {
+              answersToInsert.push({
+                entry_id: entryId,
+                question_id: ans.question_id,
+                selected_option: ans.selected_option,
+              });
+            }
+          }
+        }
+
+        if (answersToInsert.length > 0) {
+          const { error: answersErr } = await supabase.from('pain_entry_answers').insert(answersToInsert);
+          if (answersErr) throw answersErr;
+        }
       }
 
       return {
@@ -205,8 +239,8 @@ export async function savePainAssessment(payload: AssessmentSubmissionPayload): 
         assessmentId: assessData.id,
         source: 'supabase',
       };
-    } catch (err: any) {
-      console.warn('Supabase insert error, falling back to local database store:', err.message);
+    } catch (err) {
+      console.warn('Supabase insert error, falling back to local database store:', err);
     }
   }
 
@@ -270,13 +304,32 @@ export async function getAllAssessments(): Promise<{
           status,
           created_at,
           patient:patients(*),
-          entries:pain_entries(*)
+          entries:pain_entries(*, answers:pain_entry_answers(*, question:assessment_questions(*)))
         `)
         .order('created_at', { ascending: false });
 
       if (!assessErr && assessments) {
+        const processed = assessments.map((a) => {
+          const entries = (a.entries || []).map((e) => ({
+            ...e,
+            answers: (e.answers || []).map((ans: { question_id: string; selected_option: string; question?: { text?: string } }) => ({
+              question_id: ans.question_id,
+              selected_option: ans.selected_option,
+              question_text: ans.question?.text,
+            })),
+          }));
+          return {
+            id: a.id,
+            patient_id: a.patient_id,
+            overall_severity: a.overall_severity,
+            status: a.status,
+            created_at: a.created_at,
+            patient: a.patient,
+            entries,
+          };
+        });
         return {
-          data: assessments as unknown as PainAssessment[],
+          data: processed as unknown as PainAssessment[],
           source: 'supabase',
         };
       }
@@ -286,7 +339,20 @@ export async function getAllAssessments(): Promise<{
   }
 
   return {
-    data: getLocalStorageAssessments(),
+    data: getLocalStorageAssessments().map((assessment) => ({
+      ...assessment,
+      entries: assessment.entries?.map((entry) => ({
+        ...entry,
+        answers: entry.answers?.map((ans) => {
+          const questions = getLocalQuestions();
+          const q = questions.find((q) => q.id === ans.question_id);
+          return {
+            ...ans,
+            question_text: q?.text,
+          };
+        }),
+      })),
+    })),
     source: 'local',
   };
 }
@@ -309,3 +375,146 @@ export async function deleteAssessmentRecord(assessmentId: string): Promise<bool
   saveLocalStorageAssessments(filtered);
   return true;
 }
+
+/**
+ * Get all active assessment questions sorted by sort_order
+ */
+export async function getAssessmentQuestions(): Promise<{
+  data: AssessmentQuestion[];
+  source: 'supabase' | 'local';
+}> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data: questions, error } = await supabase
+        .from('assessment_questions')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (!error && questions) {
+        return {
+          data: questions as unknown as AssessmentQuestion[],
+          source: 'supabase',
+        };
+      }
+    } catch (err) {
+      console.warn('Error fetching questions from Supabase:', err);
+    }
+  }
+
+  const local = getLocalQuestions().filter((q) => q.is_active).sort((a, b) => a.sort_order - b.sort_order);
+  return {
+    data: local,
+    source: 'local',
+  };
+}
+
+/**
+ * Admin: Update assessment questions (replaces all active questions)
+ */
+export async function updateAssessmentQuestions(questions: AssessmentQuestion[]): Promise<{ success: boolean; error?: string }> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const fixedQuestions = questions.filter((q) => q.is_fixed);
+      const customQuestions = questions.filter((q) => !q.is_fixed);
+
+      if (customQuestions.length > 0) {
+        const { error: delErr } = await supabase
+          .from('assessment_questions')
+          .delete()
+          .eq('is_fixed', false);
+
+        if (delErr) throw delErr;
+
+        const { error: insErr } = await supabase.from('assessment_questions').insert(
+          customQuestions.map((q) => ({
+            id: q.id,
+            text: q.text,
+            question_type: q.question_type,
+            options: q.options,
+            video_url: q.video_url || null,
+            sort_order: q.sort_order,
+            is_active: q.is_active,
+            is_fixed: q.is_fixed,
+          }))
+        );
+
+        if (insErr) throw insErr;
+      }
+
+      const { error: updErr } = await supabase
+        .from('assessment_questions')
+        .upsert(
+          fixedQuestions.map((q) => ({
+            id: q.id,
+            text: q.text,
+            question_type: q.question_type,
+            options: q.options,
+            video_url: q.video_url || null,
+            sort_order: q.sort_order,
+            is_active: q.is_active,
+            is_fixed: q.is_fixed,
+          })),
+          { onConflict: 'id' }
+        );
+
+      if (updErr) throw updErr;
+      return { success: true };
+    } catch (err) {
+      console.warn('Supabase questions update error:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  }
+
+  saveLocalQuestions(questions);
+  return { success: true };
+}
+
+/**
+ * Admin: Toggle question active status
+ */
+export async function toggleQuestionActive(questionId: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { error } = await supabase
+        .from('assessment_questions')
+        .update({ is_active: isActive })
+        .eq('id', questionId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
+
+  const questions = getLocalQuestions();
+  const updated = questions.map((q) => (q.id === questionId ? { ...q, is_active: isActive } : q));
+  saveLocalQuestions(updated);
+  return { success: true };
+}
+
+/**
+ * Admin: Delete custom question
+ */
+export async function deleteCustomQuestion(questionId: string): Promise<{ success: boolean; error?: string }> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { error } = await supabase
+        .from('assessment_questions')
+        .delete()
+        .eq('id', questionId)
+        .eq('is_fixed', false);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
+
+  const questions = getLocalQuestions().filter((q) => q.id !== questionId && !q.is_fixed);
+  saveLocalQuestions(questions);
+  return { success: true };
+}
+

@@ -55,6 +55,69 @@ CREATE POLICY "Allow public insert access to pain_assessments" ON public.pain_as
 CREATE POLICY "Allow public read access to pain_entries" ON public.pain_entries FOR SELECT USING (true);
 CREATE POLICY "Allow public insert access to pain_entries" ON public.pain_entries FOR INSERT WITH CHECK (true);
 
+-- 4. Create Assessment Questions Table
+CREATE TABLE IF NOT EXISTS public.assessment_questions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    text TEXT NOT NULL,
+    question_type TEXT DEFAULT 'multiple_choice' CHECK (question_type IN ('multiple_choice')),
+    options JSONB NOT NULL DEFAULT '[]'::jsonb,
+    video_url TEXT,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    is_fixed BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_assessment_questions_sort ON public.assessment_questions(sort_order);
+
+ALTER TABLE public.assessment_questions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access to assessment_questions" ON public.assessment_questions FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to assessment_questions" ON public.assessment_questions FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to assessment_questions" ON public.assessment_questions FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete access to assessment_questions" ON public.assessment_questions FOR DELETE USING (true);
+
+-- 5. Create Pain Entry Answers Table
+CREATE TABLE IF NOT EXISTS public.pain_entry_answers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    entry_id UUID REFERENCES public.pain_entries(id) ON DELETE CASCADE NOT NULL,
+    question_id UUID REFERENCES public.assessment_questions(id) ON DELETE CASCADE NOT NULL,
+    selected_option TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_pain_entry_answers_entry ON public.pain_entry_answers(entry_id);
+
+ALTER TABLE public.pain_entry_answers ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access to pain_entry_answers" ON public.pain_entry_answers FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to pain_entry_answers" ON public.pain_entry_answers FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to pain_entry_answers" ON public.pain_entry_answers FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete access to pain_entry_answers" ON public.pain_entry_answers FOR DELETE USING (true);
+
+-- Seed fixed assessment questions
+INSERT INTO public.assessment_questions (id, text, question_type, options, sort_order, is_active, is_fixed)
+VALUES
+  (
+    '11111111-1111-1111-1111-111111111111',
+    'Pain Tolerance',
+    'multiple_choice',
+    '["1 (Mild)", "2", "3", "4 (Moderate)", "5", "6", "7 (Severe)", "8", "9", "10 (Worst)"]'::jsonb,
+    1,
+    true,
+    true
+  ),
+  (
+    '22222222-2222-2222-2222-222222222222',
+    'How long have you experienced this pain?',
+    'multiple_choice',
+    '["< 24 hours", "1-3 days", "1-2 weeks", "1-6 months", "Chronic (> 6 months)"]'::jsonb,
+    2,
+    true,
+    true
+  )
+ON CONFLICT (id) DO NOTHING;
+
 -- =========================================================
 -- SEED DATA (FOR TESTING ADMIN DASHBOARD)
 -- =========================================================

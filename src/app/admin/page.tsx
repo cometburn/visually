@@ -8,6 +8,7 @@ import { getAllAssessments, deleteAssessmentRecord } from '@/lib/db';
 import { getAdminSession, logoutAdmin, AdminUser } from '@/lib/auth';
 import { PainAssessment } from '@/types/database';
 import { getPainColor } from '@/lib/bodyParts';
+import { AdminQuestions } from '@/components/AdminQuestions';
 import {
   ShieldCheck,
   Search,
@@ -22,11 +23,14 @@ import {
   FileText,
   LogOut,
   UserCheck,
+  LayoutDashboard,
+  Settings2,
 } from 'lucide-react';
 
 export default function AdminDashboardPage() {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [authChecked, setAuthChecked] = useState<boolean>(false);
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'questions'>('dashboard');
 
   const [assessments, setAssessments] = useState<PainAssessment[]>([]);
   const [dbSource, setDbSource] = useState<'supabase' | 'local'>('local');
@@ -40,16 +44,6 @@ export default function AdminDashboardPage() {
   // Inspection Drawer Modal
   const [selectedAssessment, setSelectedAssessment] = useState<PainAssessment | null>(null);
 
-  // Check auth status on mount
-  useEffect(() => {
-    const session = getAdminSession();
-    setCurrentUser(session);
-    setAuthChecked(true);
-    if (session) {
-      fetchRecords();
-    }
-  }, []);
-
   const fetchRecords = async () => {
     setLoading(true);
     try {
@@ -62,6 +56,19 @@ export default function AdminDashboardPage() {
       setLoading(false);
     }
   };
+
+  // Check auth status on mount
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const session = getAdminSession();
+      setCurrentUser(session);
+      setAuthChecked(true);
+      if (session) {
+        fetchRecords();
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   const handleLogout = async () => {
     await logoutAdmin();
@@ -175,6 +182,30 @@ export default function AdminDashboardPage() {
             <p className="text-sm text-slate-400">
               Inspect submitted patient body pain ratings, location heatmaps, and medical history logs.
             </p>
+            <div className="flex items-center gap-2 mt-3">
+              <button
+                onClick={() => setAdminTab('dashboard')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                  adminTab === 'dashboard'
+                    ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                    : 'text-slate-400 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <LayoutDashboard className="w-3.5 h-3.5 inline mr-1.5" />
+                Dashboard
+              </button>
+              <button
+                onClick={() => setAdminTab('questions')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                  adminTab === 'questions'
+                    ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                    : 'text-slate-400 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <Settings2 className="w-3.5 h-3.5 inline mr-1.5" />
+                Assessment Questions
+              </button>
+            </div>
           </div>
 
           {/* User Info & Actions */}
@@ -209,8 +240,10 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Overview Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {adminTab === 'dashboard' && (
+          <>
+            {/* Overview Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2">
             <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
               <span>Total Patient Records</span>
@@ -402,7 +435,15 @@ export default function AdminDashboardPage() {
             </table>
           </div>
         </div>
-      </main>
+        </>
+      )}
+
+      {adminTab === 'questions' && (
+        <div className="animate-in fade-in duration-200">
+          <AdminQuestions />
+        </div>
+      )}
+    </main>
 
       {/* Patient Assessment Detail Modal / Drawer */}
       {selectedAssessment && (
@@ -479,15 +520,24 @@ export default function AdminDashboardPage() {
                             <div>
                               Duration: <span className="text-slate-200 font-medium">{entry.duration}</span>
                             </div>
-                            <div>
-                              Symptom: <span className="text-cyan-300 font-medium">{entry.symptom_type || 'Aching'}</span>
-                            </div>
                           </div>
 
                           {entry.notes && (
                             <p className="text-xs text-slate-400 italic bg-slate-950/40 p-2 rounded-xl border border-slate-800/60">
-                              "{entry.notes}"
+                              &ldquo;{entry.notes}&rdquo;
                             </p>
+                          )}
+
+                          {entry.answers && entry.answers.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
+                              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Assessment Responses</span>
+                              {entry.answers.map((ans) => (
+                                <div key={ans.question_id} className="flex items-center justify-between text-xs">
+                                  <span className="text-slate-500">{ans.question_text || (ans.question_id.startsWith('11111111') ? 'Pain Tolerance' : ans.question_id.startsWith('22222222') ? 'Duration' : 'Question')}</span>
+                                  <span className="text-slate-200 font-medium">{ans.selected_option}</span>
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
                       );

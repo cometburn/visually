@@ -5,12 +5,12 @@ import confetti from 'canvas-confetti';
 import { Navbar } from '@/components/Navbar';
 import { PatientForm } from '@/components/PatientForm';
 import { BodyMap } from '@/components/BodyMap';
-import { PainModal } from '@/components/PainModal';
+import { AssessmentQuestionModal } from '@/components/AssessmentQuestionModal';
 import { AssessmentSummary } from '@/components/AssessmentSummary';
 import { BodyZone, getBodyZoneById } from '@/lib/bodyParts';
 import { Gender, PainEntry } from '@/types/database';
 import { savePainAssessment } from '@/lib/db';
-import { Activity, UserCheck, HeartPulse, ChevronLeft, ShieldCheck, ArrowRight } from 'lucide-react';
+import { HeartPulse, ChevronLeft } from 'lucide-react';
 
 export default function PatientAssessmentPage() {
   const [step, setStep] = useState<1 | 2>(1);
@@ -100,7 +100,7 @@ export default function PatientAssessmentPage() {
             spread: 70,
             origin: { y: 0.6 },
           });
-        } catch (e) {
+        } catch {
           // ignore confetti if unsupported
         }
       }
@@ -197,7 +197,7 @@ export default function PatientAssessmentPage() {
         )}
 
         {/* Pain Details Modal */}
-        <PainModal
+        <AssessmentQuestionModal
           isOpen={isModalOpen}
           zone={selectedZone}
           existingEntry={existingEntryForModal}

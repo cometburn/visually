@@ -10,10 +10,8 @@ import {
   UserCheck,
   ShieldCheck,
   RotateCcw,
-  Sparkles,
-  Download,
 } from 'lucide-react';
-import { PainEntry, Patient } from '@/types/database';
+import { PainEntry, QuestionAnswer } from '@/types/database';
 import { getPainColor } from '@/lib/bodyParts';
 
 interface AssessmentSummaryProps {
@@ -172,6 +170,15 @@ export function AssessmentSummary({
                       Duration: <span className="text-slate-200 font-medium">{entry.duration}</span>
                       {entry.symptom_type && ` • ${entry.symptom_type}`}
                     </p>
+                    {entry.answers && entry.answers.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {entry.answers.map((ans: QuestionAnswer) => (
+                          <span key={ans.question_id} className="px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[10px] font-medium border border-slate-700/60">
+                            {ans.selected_option}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 

@@ -22,6 +22,13 @@ export interface PainEntry {
   symptom_type?: string; // Sharp, Throbbing, Aching, Burning, etc.
   notes?: string;
   created_at?: string;
+  answers?: QuestionAnswer[];
+}
+
+export interface QuestionAnswer {
+  question_id: string;
+  selected_option: string;
+  question_text?: string;
 }
 
 export interface PainAssessment {
@@ -42,4 +49,16 @@ export interface AssessmentSubmissionPayload {
     notes?: string;
   };
   entries: PainEntry[];
+}
+
+export interface AssessmentQuestion {
+  id: string;
+  text: string;
+  question_type: 'multiple_choice';
+  options: string[];
+  video_url?: string;
+  sort_order: number;
+  is_active: boolean;
+  is_fixed: boolean;
+  created_at: string;
 }
