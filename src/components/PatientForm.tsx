@@ -75,7 +75,7 @@ export function PatientForm({ initialValues, onSubmit }: PatientFormProps) {
         <div className="space-y-2 text-center sm:text-left">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs font-semibold text-blue-400">
             <Activity className="w-3.5 h-3.5" />
-            <span>Step 1 of 2: Patient Registration</span>
+            <span>Step {step} of 3: Patient Registration</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
             Patient General Information
