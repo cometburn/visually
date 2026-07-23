@@ -164,7 +164,6 @@ export async function savePainAssessment(payload: AssessmentSubmissionPayload): 
           name: payload.patient.name,
           age: payload.patient.age,
           gender: payload.patient.gender,
-          notes: payload.patient.notes || null,
         })
         .select()
         .single();
@@ -254,7 +253,6 @@ export async function savePainAssessment(payload: AssessmentSubmissionPayload): 
     name: payload.patient.name,
     age: payload.patient.age,
     gender: payload.patient.gender,
-    notes: payload.patient.notes,
     created_at: nowStr,
   };
 

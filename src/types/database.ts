@@ -46,7 +46,6 @@ export interface AssessmentSubmissionPayload {
     name: string;
     age: number;
     gender: Gender;
-    notes?: string;
   };
   entries: PainEntry[];
 }

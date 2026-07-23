@@ -19,7 +19,6 @@ interface AssessmentSummaryProps {
     name: string;
     age: number;
     gender: string;
-    notes?: string;
   };
   entries: PainEntry[];
   onEditPatient: () => void;

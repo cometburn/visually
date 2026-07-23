@@ -20,7 +20,6 @@ export default function PatientAssessmentPage() {
     name: string;
     age: number;
     gender: Gender;
-    notes?: string;
   }>({
     name: '',
     age: 25,
@@ -41,7 +40,7 @@ export default function PatientAssessmentPage() {
   const [dbSource, setDbSource] = useState<'supabase' | 'local'>('local');
 
   // Step 1 Submission
-  const handlePatientSubmit = (data: { name: string; age: number; gender: Gender; notes?: string }) => {
+  const handlePatientSubmit = (data: { name: string; age: number; gender: Gender }) => {
     setPatient(data);
     setStep(2);
   };
